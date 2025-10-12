@@ -1,0 +1,122 @@
+#include <iostream>
+#include <string>
+#include <list>
+
+using namespace std;
+
+class Student {
+public:
+    string name;
+    int student_id;
+
+    Student(string n, int id) {
+        name = n;
+        student_id = id;
+    }
+};
+
+class Queue {
+private:
+    list<Student> students;
+
+public:
+    void add_student() {
+        string name;
+        int student_id;
+
+        cout << "Enter student name: ";
+        cin.ignore();
+        getline(cin, name);
+
+        cout << "Enter student ID: ";
+        cin >> student_id;
+
+        students.push_back(Student(name, student_id));
+        cout << "Student " << name << " added to the queue." << endl;
+    }
+
+    void serve_student() {
+        if (students.empty()) {
+            cout << "Queue is empty." << endl;
+        } else {
+            Student student = students.front();
+            students.pop_front();
+            cout << "Student " << student.name << " served." << endl;
+        }
+    }
+
+    void student_leaves() {
+        int student_id;
+        cout << "Enter student ID: ";
+        cin >> student_id;
+
+        for (auto it = students.begin(); it != students.end(); ++it) {
+            if (it->student_id == student_id) {
+                students.erase(it);
+                cout << "Student with ID " << student_id << " removed from the queue." << endl;
+                return;
+            }
+        }
+
+        cout << "Student not found in the queue." << endl;
+    }
+
+    void display_queue() {
+        if (students.empty()) {
+            cout << "Queue is empty." << endl;
+        } else {
+            cout << "Current queue:" << endl;
+            int position = 1;
+            for (const auto& student : students) {
+                cout << position << ". " << student.name << " (" << student.student_id << ")" << endl;
+                position++;
+            }
+        }
+    }
+
+    void count_students() {
+        cout << "Total students in the queue: " << students.size() << endl;
+    }
+};
+
+int main() {
+    Queue queue;
+    int choice;
+
+    while (true) {
+        cout << "\nOptions:" << endl;
+        cout << "1. Add Student" << endl;
+        cout << "2. Serve Student" << endl;
+        cout << "3. Student Leaves" << endl;
+        cout << "4. Display Queue" << endl;
+        cout << "5. Count Students" << endl;
+        cout << "6. Exit" << endl;
+
+        cout << "Choose an option: ";
+        cin >> choice;
+
+        switch (choice) {
+            case 1:
+                queue.add_student();
+                break;
+            case 2:
+                queue.serve_student();
+                break;
+            case 3:
+                queue.student_leaves();
+                break;
+            case 4:
+                queue.display_queue();
+                break;
+            case 5:
+                queue.count_students();
+                break;
+            case 6:
+                return 0;
+            default:
+                cout << "Invalid option. Please choose again." << endl;
+        }
+    }
+
+    return 0;
+}
