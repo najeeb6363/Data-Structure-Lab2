@@ -1,0 +1,289 @@
+#include <iostream>
+#include <string>
+#include <algorithm>
+
+using namespace std;
+
+// Standard BST Node with Subtree Size for O(h) Rank/Kth
+struct PlayerNode {
+    int rating;
+    string name;
+    long long hp;
+    int sz; // Critical for RANK and KTH performance
+    PlayerNode *left, *right;
+
+    PlayerNode(int r, string n, long long h) 
+        : rating(r), name(n), hp(h), sz(1), left(NULL), right(NULL) {}
+};
+
+// --- Helper Functions ---
+
+int getSz(PlayerNode* node) {
+    return node ? node->sz : 0;
+}
+
+void updateSz(PlayerNode* node) {
+    if (node)
+        node->sz = 1 + getSz(node->left) + getSz(node->right);
+}
+
+// --- Core Operations ---
+
+PlayerNode* join(PlayerNode* node, int r, string n, long long h, bool &duplicate) {
+    if (!node) return new PlayerNode(r, n, h);
+
+    if (r < node->rating)
+        node->left = join(node->left, r, n, h, duplicate);
+    else if (r > node->rating)
+        node->right = join(node->right, r, n, h, duplicate);
+    else {
+        duplicate = true;
+        return node;
+    }
+
+    updateSz(node);
+    return node;
+}
+
+PlayerNode* getMin(PlayerNode* node) {
+    while (node && node->left) node = node->left;
+    return node;
+}
+
+PlayerNode* leave(PlayerNode* node, int r, bool &found) {
+    if (!node) return NULL;
+
+    if (r < node->rating)
+        node->left = leave(node->left, r, found);
+    else if (r > node->rating)
+        node->right = leave(node->right, r, found);
+    else {
+        found = true;
+        // Standard BST Deletion cases
+        if (!node->left) {
+            PlayerNode* temp = node->right;
+            delete node;
+            return temp;
+        }
+        if (!node->right) {
+            PlayerNode* temp = node->left;
+            delete node;
+            return temp;
+        }
+        PlayerNode* temp = getMin(node->right);
+        node->rating = temp->rating;
+        node->name = temp->name;
+        node->hp = temp->hp;
+        node->right = leave(node->right, temp->rating, found);
+    }
+
+    updateSz(node);
+    return node;
+}
+
+PlayerNode* find(PlayerNode* node, int r) {
+    if (!node || node->rating == r) return node;
+    return (r < node->rating) ? find(node->left, r) : find(node->right, r);
+}
+
+// --- Matchmaking Logic (Tie Rule: Choose lower rating) ---
+
+void match(PlayerNode* root, int x) {
+    if (!root) {
+        cout << "EMPTY\n";
+        return;
+    }
+
+    PlayerNode *pre = NULL, *suc = NULL, *curr = root;
+    while (curr) {
+        if (curr->rating < x) {
+            pre = curr;
+            curr = curr->right;
+        } else if (curr->rating > x) {
+            suc = curr;
+            curr = curr->left;
+        } else {
+            // Rule: Match must be against a DIFFERENT opponent
+            curr = curr->left; 
+        }
+    }
+
+    if (!pre && !suc) cout << "EMPTY\n";
+    else if (!suc || (pre && (long long)x - pre->rating <= (long long)suc->rating - x))
+        cout << pre->rating << " " << pre->name << " " << pre->hp << "\n";
+    else
+        cout << suc->rating << " " << suc->name << " " << suc->hp << "\n";
+}
+
+// --- Order Statistics & Traversal ---
+
+void range(PlayerNode* node, int L, int R, bool &any) {
+    if (!node) return;
+    if (node->rating > L) range(node->left, L, R, any);
+    if (node->rating >= L && node->rating <= R) {
+        cout << node->rating << " " << node->name << " " << node->hp << "\n";
+        any = true;
+    }
+    if (node->rating < R) range(node->right, L, R, any);
+}
+
+int getRank(PlayerNode* node, int x) {
+    if (!node) return 0;
+    if (x <= node->rating) return getRank(node->left, x);
+    return 1 + getSz(node->left) + getRank(node->right, x);
+}
+
+PlayerNode* getKth(PlayerNode* node, int k) {
+    int leftSize = getSz(node->left);
+    if (k == leftSize + 1) return node;
+    if (k <= leftSize) return getKth(node->left, k);
+    return getKth(node->right, k - leftSize - 1);
+}
+
+// --- Duel Logic (LCA + Depth) ---
+
+PlayerNode* getLCA(PlayerNode* node, int a, int b) {
+    if (a < node->rating && b < node->rating) return getLCA(node->left, a, b);
+    if (a > node->rating && b > node->rating) return getLCA(node->right, a, b);
+    return node;
+}
+
+int depth(PlayerNode* node, int r, int d) {
+    if (node->rating == r) return d;
+    return (r < node->rating) ? depth(node->left, r, d + 1) : depth(node->right, r, d + 1);
+}
+
+// --- Structural Stats ---
+
+int height(PlayerNode* node) {
+    if (!node) return -1; // Standard height rule: empty = -1
+    return 1 + max(height(node->left), height(node->right));
+}
+
+int countLeaves(PlayerNode* node) {
+    if (!node) return 0;
+    if (!node->left && !node->right) return 1;
+    return countLeaves(node->left) + countLeaves(node->right);
+}
+
+int main() {
+    // Fast I/O essential for 200,000 queries
+    ios::sync_with_stdio(false);
+    cin.tie(NULL);
+
+    int Q;
+    if (!(cin >> Q)) return 0;
+
+    PlayerNode* root = NULL;
+
+    while (Q--) {
+        string cmd;
+        cin >> cmd;
+
+        if (cmd == "JOIN") {
+            int r; string n; long long h;
+            cin >> r >> n >> h;
+            bool dup = false;
+            root = join(root, r, n, h, dup);
+            cout << (dup ? "DUPLICATE\n" : "JOINED\n");
+        } 
+        else if (cmd == "LEAVE") {
+            int r; cin >> r;
+            bool found = false;
+            root = leave(root, r, found);
+            cout << (found ? "LEFT\n" : "NOT FOUND\n");
+        } 
+        else if (cmd == "STATUS") {
+            int r; cin >> r;
+            PlayerNode* p = find(root, r);
+            if (!p) cout << "NOT FOUND\n";
+            else cout << p->rating << " " << p->name << " " << p->hp << "\n";
+        } 
+        else if (cmd == "DAMAGE") {
+            int r; long long a; cin >> r >> a;
+            PlayerNode* p = find(root, r);
+            if (!p) cout << "NOT FOUND\n";
+            else {
+                p->hp = max(0LL, p->hp - a); // Health cannot be negative
+                cout << "DAMAGED " << p->hp << "\n";
+            }
+        } 
+        else if (cmd == "HEAL") {
+            int r; long long a; cin >> r >> a;
+            PlayerNode* p = find(root, r);
+            if (!p) cout << "NOT FOUND\n";
+            else {
+                p->hp += a;
+                cout << "HEALED " << p->hp << "\n";
+            }
+        } 
+        else if (cmd == "MATCH") {
+            int x; cin >> x;
+            match(root, x);
+        } 
+        else if (cmd == "NEXT") {
+            int x; cin >> x;
+            PlayerNode *res = NULL, *cur = root;
+            while (cur) {
+                if (cur->rating > x) { res = cur; cur = cur->left; }
+                else cur = cur->right;
+            }
+            if (!res) cout << "NONE\n";
+            else cout << res->rating << " " << res->name << " " << res->hp << "\n";
+        } 
+        else if (cmd == "PREV") {
+            int x; cin >> x;
+            PlayerNode *res = NULL, *cur = root;
+            while (cur) {
+                if (cur->rating < x) { res = cur; cur = cur->right; }
+                else cur = cur->left;
+            }
+            if (!res) cout << "NONE\n";
+            else cout << res->rating << " " << res->name << " " << res->hp << "\n";
+        } 
+        else if (cmd == "RANGE") {
+            int L, R; cin >> L >> R;
+            bool any = false;
+            range(root, L, R, any);
+            if (!any) cout << "EMPTY\n";
+        } 
+        else if (cmd == "RANK") {
+            int x; cin >> x;
+            cout << getRank(root, x) << "\n";
+        } 
+        else if (cmd == "KTH") {
+            int k; cin >> k;
+            if (k < 1 || k > getSz(root))
+                cout << "OUT_OF_RANGE\n"; // Fixed Formatting
+            else {
+                PlayerNode* p = getKth(root, k);
+                cout << p->rating << " " << p->name << " " << p->hp << "\n";
+            }
+        } 
+        else if (cmd == "DUEL") {
+            int a, b; cin >> a >> b;
+            if (!find(root, a) || !find(root, b))
+                cout << "NOT_FOUND\n"; // Fixed Formatting
+            else {
+                PlayerNode* lca = getLCA(root, a, b);
+                int d = depth(lca, a, 0) + depth(lca, b, 0);
+                cout << "DIST " << d << "\n";
+            }
+        } 
+        else if (cmd == "STATS") {
+            cout << "PLAYERS " << getSz(root) << "\n";
+            if (!root) {
+                cout << "MIN NONE\nMAX NONE\n";
+            } else {
+                PlayerNode *mn = root, *mx = root;
+                while (mn->left) mn = mn->left;
+                while (mx->right) mx = mx->right;
+                cout << "MIN " << mn->rating << "\n";
+                cout << "MAX " << mx->rating << "\n";
+            }
+            cout << "HEIGHT " << height(root) << "\n";
+            cout << "LEAVES " << countLeaves(root) << "\n";
+        }
+    }
+    return 0;
+}
